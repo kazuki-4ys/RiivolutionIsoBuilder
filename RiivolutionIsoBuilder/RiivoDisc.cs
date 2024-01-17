@@ -110,6 +110,8 @@ namespace RiivolutionIsoBuilder
         public bool recursive;
         public uint length;
 
+        public bool valid = true;
+
         public Folder()
         {
             disc = "";
@@ -117,6 +119,7 @@ namespace RiivolutionIsoBuilder
             resize = true;
             create = false;
             recursive = true;
+            valid = true;
             length = 0;
         }
     }
@@ -312,6 +315,7 @@ namespace RiivolutionIsoBuilder
                     patch.root = defaultRoot;
 
                 patch.root = patch.root.Replace("/", "\\");
+                if (patch.root.Length > 0 && patch.root[patch.root.Length - 1] == '\\') patch.root = patch.root.Remove(patch.root.Length - 1, 1);
 
                 //Console.WriteLine("Found " + patchNode.ChildNodes.Count + " nodes in " + patch.id);
                 if (patchNode.ChildNodes.Count < 1)
@@ -339,10 +343,7 @@ namespace RiivolutionIsoBuilder
                         Folder folder = new Folder();
 
                         folder.disc = patchSubnode.Attributes["disc"].Value().Replace("/", "\\");
-                        if (folder.disc == "\\") folder.disc = "root";
-                        if (folder.disc.EndsWith("\\")) folder.disc = folder.disc.Substring(0, folder.disc.Length - 1);
                         folder.external = patchSubnode.Attributes["external"].Value().Replace("/", "\\");
-                        if (folder.external.EndsWith("\\")) folder.external = folder.external.Substring(0, folder.external.Length - 1);
                         folder.resize = patchSubnode.Attributes["resize"].Value().AsBool(folder.resize);
                         folder.create = patchSubnode.Attributes["create"].Value().AsBool(folder.create);
                         folder.recursive = patchSubnode.Attributes["recursive"].Value().AsBool(folder.recursive);
@@ -350,6 +351,7 @@ namespace RiivolutionIsoBuilder
 
                         patch.folderPatches.Add(folder);
                     }
+
                     else if (patchName == "savegame")
                     {
                         Savegame savegame = new Savegame();
@@ -384,6 +386,17 @@ namespace RiivolutionIsoBuilder
                         }
 
                         patch.memoryPatches.Add(memory);
+                    }
+                }
+
+                //mkwii my stuff
+                for(int i = 0;i < patch.folderPatches.Count;i++){
+                    if((!patch.folderPatches[i].recursive) && (patch.folderPatches[i].disc == "")){
+                        if(i == patch.folderPatches.Count - 1)break;
+                        if(patch.folderPatches[i].external == patch.folderPatches[i + 1].external){
+                            patch.folderPatches[i].valid = false;
+                            patch.folderPatches[i + 1].recursive = false;
+                        }
                     }
                 }
 

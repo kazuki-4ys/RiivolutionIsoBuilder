@@ -25,6 +25,20 @@ namespace RiivolutionIsoBuilder
 
     public class RiivolutionUniversalISOBuilder
     {
+        public string GetCommandBinFullPath(string command)
+        {
+            string rawPath = System.Environment.GetEnvironmentVariable("PATH");
+            string[] paths = rawPath.Split(';');
+            foreach(string p in paths)
+            {
+                string checkPath = p + "\\" + command + ".exe";
+                if (System.IO.File.Exists(checkPath))
+                {
+                    return checkPath;
+                }
+            }
+            return "";
+        }
         public void Main(string[] args)
         {
             string ISOPath = "", xmlPath = "", outPath = "", singleChoice = "Ask", newTitleID = "", newGameName = "";
@@ -260,7 +274,7 @@ namespace RiivolutionIsoBuilder
 
             Console.WriteLine("TitleID found: " + titleID + "\r\nGame name found: " + gameName + "\r\n");
 
-            if (disc.gameFilter.game != gameID)
+            if (disc.gameFilter.game.Substring(0, 3) != gameID)
             {
                 Console.WriteLine("Warning: This riivolution patch only applied to the game that has the TitleID " + disc.gameFilter.game + ".\r\nYours uses the TitleID " + gameID + " and therefore cannot be patched.");
                 if (ignoreLevel < 1)
@@ -412,8 +426,6 @@ namespace RiivolutionIsoBuilder
                 }
             }
 
-            Dolpatcher dp = new Dolpatcher(extDir + "\\sys\\main.dol", isSilent);
-
             System.Diagnostics.Process copy = new System.Diagnostics.Process();
             copy.StartInfo.FileName = "cmd.exe";
             copy.StartInfo.UseShellExecute = false;
@@ -431,104 +443,69 @@ namespace RiivolutionIsoBuilder
                 foreach(File filePatch in patch.filePatches)
                 {
                     doStringTIDReplacements(ref filePatch.external);
-
-                    string file = rootPath + patch.root + "\\" + filePatch.external;
-                    string extPath = extDir + "\\files" + filePatch.disc;
-                    //Console.WriteLine("Copying " + path + " to " + extPath);
-
-                    if ((filePatch.disc == null || filePatch.disc == "") ? true : Directory.Exists(extPath)) // Avoid running useless copy commands for folders that doesn't exist AND don't have the "created" flag enabled (this is used for region-specific folders in NewerSMBW, for example)
+                    string file = "";
+                    if (filePatch.external[0] != '\\')
                     {
-                        if (filePatch.disc != "" && filePatch.disc != null)
-                        {
-                            if (!isSilent) Console.WriteLine("Copying " + patch.root + "\\" + filePatch.external);
-
-                            copy.StartInfo.Arguments = "/C xcopy /b \"" + file + "\" \"" + extPath + "\"";
-                        }
-                        else if (Directory.Exists(file))
-                        {
-                            if (!isSilent) Console.WriteLine("Searching manually for file named " + Path.GetFileName(file));
-                            string foundFile = ProcessDirectory(extDir + "\\files\\", Path.GetFileName(file));
-                            if (foundFile != "")
-                            {
-                                if (!isSilent) Console.WriteLine("Found file " + foundFile);
-                                copy.StartInfo.Arguments = "/C copy /b \"" + file + "\" \"" + foundFile + "\"";
-
-                                copy.Start();
-                                if (!isSilent) Console.WriteLine(copy.StandardOutput.ReadToEnd());
-                                copy.WaitForExit();
-                            }
-                            else
-                            {
-                                if (!isSilent) Console.WriteLine("Cannot find file " + file + " in the disc\r\n");
-                                continue;
-                            }
-                            if (!isSilent) { Console.WriteLine(""); } // Just for good-looking purposes.
-                            continue;
-                        }
-
-                        copy.Start();
-                        if (!isSilent) { Console.WriteLine(copy.StandardOutput.ReadToEnd()); } else { copy.StandardOutput.ReadToEnd(); }
-                        copy.WaitForExit();
+                        file = rootPath + patch.root + "\\" + filePatch.external;
+                    }
+                    else
+                    {
+                        file = rootPath + filePatch.external.Substring(1);
+                    }
+                    //Console.WriteLine("file = " + file);
+                    string extPath = extDir + "\\files" + filePatch.disc;
+                    //Console.WriteLine("extPath = " + extPath);
+                    if (filePatch.disc == "main.dol" || filePatch.disc == "/main.dol"){
+                        if(System.IO.File.Exists(file)) System.IO.File.Copy(file, extDir + "\\sys\\main.dol", true);
+                    }else{
+                        if(System.IO.File.Exists(file)) System.IO.File.Copy(file, extPath, true);
                     }
                 }
 
                 foreach(Folder folderPatch in patch.folderPatches)
                 {
                     doStringTIDReplacements(ref folderPatch.external);
+                    string path = "";
 
-                    string path = rootPath + patch.root + "\\" + folderPatch.external;
+                    if (folderPatch.external[0] != '\\')
+                    {
+                        path = rootPath + patch.root + "\\" + folderPatch.external;
+                    }
+                    else
+                    {
+                        path = rootPath + folderPatch.external.Substring(1);
+                    }
+
+                    //Console.WriteLine("path = " + path);
+
                     string extPath = extDir + "\\files" + ((folderPatch.disc == "root") ? "" : folderPatch.disc);
+                    //Console.WriteLine("extPath = " + extPath);
                     //Console.WriteLine("Copying " + path + " to " + extPath);
 
-                    if (folderPatch.create && !Directory.Exists(extPath))
-                    {
-                        if (!isSilent) Console.WriteLine("Creating directory " + extPath);
-                        runCommand("cmd.exe", "/C mkdir \"" + extPath + "\"", isSilent);
-                    }
-
-                    if ((folderPatch.disc == null || folderPatch.disc == "") ? true : Directory.Exists(extPath)) // Avoid running useless copy commands for folders that doesn't exist AND don't have the "created" flag enabled (this is used for region-specific folders in NewerSMBW, for example)
-                    {
-                        if (folderPatch.disc != "" && folderPatch.disc != null)
-                        {
-                            if (!isSilent) Console.WriteLine("Copying " + path + " to " + extPath);
-                            string recursive = "";
-                            if (folderPatch.recursive == true)
-                            {
-                                recursive = " /E";
-                            }
-                            copy.StartInfo.Arguments = "/C xcopy \"" + path + "\" \"" + extPath + "\"" + recursive + " /C /I /Y";
-                        }
-                        else if (Directory.Exists(path))
-                        {
-                            if (!isSilent) Console.WriteLine("Searching manually for files contained in " + path);
-                            foreach (string file in Directory.GetFiles(path))
-                            {
-                                if (!isSilent) Console.WriteLine("Searching for " + file);
-                                string foundFile = ProcessDirectory(extDir + "\\files\\", Path.GetFileName(file));
-                                if (foundFile != "")
-                                {
-                                    if (!isSilent) Console.WriteLine("Found file " + foundFile);
-                                    copy.StartInfo.Arguments = "/C copy /b \"" + file + "\" \"" + foundFile + "\"";
-
-                                    copy.Start();
-                                    if (!isSilent) Console.WriteLine(copy.StandardOutput.ReadToEnd());
-                                    copy.WaitForExit();
-                                }
-                                else
-                                {
-                                    if (!isSilent) Console.WriteLine("Cannot find file " + file + " in the disc\r\n");
-                                    continue;
+                    if (folderPatch.valid == true && folderPatch.recursive == true){
+                        runCommand(GetCommandBinFullPath("robocopy"), "\"" + path + "\" \"" + extPath + "\" /s /e", false);
+                    }else if (folderPatch.valid == true){
+                        //mkwii mystuff
+                        var externalFiles = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
+                        var discFiles = Directory.GetFiles(extPath, "*", SearchOption.AllDirectories);
+                        //Console.WriteLine("start externalFiles printing");
+                        //foreach(var ex in externalFiles)Console.WriteLine(ex);
+                        //Console.WriteLine("start discFiles printing");
+                        //foreach(var ex in discFiles)Console.WriteLine(ex);
+                        foreach(var ex in externalFiles){
+                            if(Path.GetFileName(ex) == "main.dol"){
+                                System.IO.File.Copy(ex, extDir + "\\sys\\main.dol", true);
+                            }else{
+                                string exFileName = Path.GetFileName(ex);
+                                for(int i = 0;i < discFiles.Length;i++){
+                                    if(exFileName == Path.GetFileName(discFiles[i]))System.IO.File.Copy(ex, discFiles[i], true);
                                 }
                             }
-                            if (!isSilent) Console.WriteLine(""); // Just for good-looking purposes.
-                            continue;
                         }
-
-                        copy.Start();
-                        if (!isSilent) { Console.WriteLine(copy.StandardOutput.ReadToEnd()); } else { copy.StandardOutput.ReadToEnd(); }
-                        copy.WaitForExit();
                     }
                 }
+
+                Dolpatcher dp = new Dolpatcher(extDir + "\\sys\\main.dol", isSilent);
 
                 foreach (Memory memoryPatch in patch.memoryPatches)
                 {
@@ -556,6 +533,8 @@ namespace RiivolutionIsoBuilder
                         }
                     }
                 }
+
+                dp.saveDol();
             }
 
             if (!skipAllDone)
@@ -576,8 +555,6 @@ namespace RiivolutionIsoBuilder
                         "If you can, ask your mod's maker to put their code hacks in a different place.", "Memory Patches Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
-
-            dp.saveDol();
 
             Console.WriteLine("Done patching, rebuilding...");
 
