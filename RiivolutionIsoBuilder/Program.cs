@@ -458,7 +458,10 @@ namespace RiivolutionIsoBuilder
                     if (filePatch.disc == "main.dol" || filePatch.disc == "/main.dol"){
                         if(System.IO.File.Exists(file)) System.IO.File.Copy(file, extDir + "\\sys\\main.dol", true);
                     }else{
-                        if(System.IO.File.Exists(file)) System.IO.File.Copy(file, extPath, true);
+                        if(System.IO.File.Exists(file)){
+                            if(!Directory.Exists(System.IO.Path.GetDirectoryName(extPath)))Directory.CreateDirectory(System.IO.Path.GetDirectoryName(extPath));
+                            System.IO.File.Copy(file, extPath, true);
+                        }
                     }
                 }
 
@@ -481,6 +484,9 @@ namespace RiivolutionIsoBuilder
                     string extPath = extDir + "\\files" + ((folderPatch.disc == "root") ? "" : folderPatch.disc);
                     //Console.WriteLine("extPath = " + extPath);
                     //Console.WriteLine("Copying " + path + " to " + extPath);
+                    if(folderPatch.valid == true){
+                        if(!Directory.Exists(extPath))Directory.CreateDirectory(extPath);
+                    }
 
                     if (folderPatch.valid == true && folderPatch.recursive == true){
                         runCommand(GetCommandBinFullPath("robocopy"), "\"" + path + "\" \"" + extPath + "\" /s /e", false);
